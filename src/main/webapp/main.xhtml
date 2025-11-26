@@ -1,0 +1,740 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE html>
+<html
+  lang="en"
+  xmlns="http://www.w3.org/1999/xhtml"
+  xmlns:jsf="http://xmlns.jcp.org/jsf"
+  xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+  xmlns:h="http://xmlns.jcp.org/jsf/html"
+  xmlns:f="http://xmlns.jcp.org/jsf/core"
+  xmlns:c="http://xmlns.jcp.org/jsp/jstl/core"
+  xmlns:a="http://xmlns.jcp.org/jsf/passthrough"
+  >
+
+  <f:metadata>
+    <f:viewAction action="#{mainController.loadData()}" phase="UPDATE_MODEL_VALUES" />
+  </f:metadata>
+
+  <!-- SPA (single-page-application) view that supports full C-R-U-D for Students -->
+  <h:head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- title of tab/window in browser -->
+    <title>#{uiconsts['viewTitle']}</title>
+    <!-- Use modern Frontend artifacts such as JQuery, Font Awesome, Bootstrap etc. -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" crossorigin="anonymous" />
+    <link href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" type="text/css" rel="stylesheet" crossorigin="anonymous" />
+    <link href="https://unpkg.com/bootstrap@4.5.2/dist/css/bootstrap.min.css" type="text/css" rel="stylesheet"  crossorigin="anonymous" />
+    <script src="https://unpkg.com/bootstrap@4.5.2/dist/js/bootstrap.min.js" crossorigin="anonymous" />
+    
+    <!-- misc style tweaks: table hover color (you can change/add to this if you like) -->
+    <style>
+      .table-hover tbody tr:hover td, .table-hover tbody tr:hover th {
+        background-color: #f0f0e0;
+      }
+      .table td {
+        position: relative;
+      }
+      .table td input {
+        position: absolute;
+        display: block;
+        top:0;
+        left:0;
+        height: 100% !important;
+        width: 100%;
+        border-radius: 0 !important;
+        border: 1px solid orange;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+      .refreshFooter {
+        height: 100% !important;
+        display:block; 
+        text-align: center;
+      }
+      .placeholder-darkgray {
+       color: #a9a9a9
+      }
+    </style>
+  </h:head>
+  
+  <h:body>
+    <div class="container-fluid">
+    
+      <!-- top navigation bar -->
+      <nav id="topbar" class="navbar navbar-light bg-light">
+        <div class="navbar-header">
+          <i class="navbar-brand fa fa-school fa-lg"/>
+          <h:outputText value="#{uiconsts['viewTitle']}"/>
+        </div>
+        <div class="navbar-header">
+          <h:panelGroup rendered="#{externalContext.userPrincipal eq null}">
+            <a href="#" data-toggle="modal" data-target="#loginModal"><span style="color: black;"><i class="fa fa-sign-in-alt" />&#160;#{uiconsts['signin']}</span></a>
+            <div id="loginModal" class="modal">
+              <h:form class="form" role="form" id="login">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h:outputText style="color: black;" escape="false" value="#{uiconsts['login']}" /> 
+                      <button type="button" class="close" data-dismiss="modal">&#8855;</button>
+                    </div>
+                    <div class="modal-body">
+                      <h:panelGroup cellpadding="2" cellspacing="1" class="input-group">
+                        <div class="input-group-prepend">
+                          <span class="input-group-text" id="username-addon"><i class="fa fa-edit fa-fw"/></span>
+                        </div>
+                        <h:inputText id="username" styleClass="form-control placeholder-darkgray"
+                          aria-describedby="username-addon" value="#{loginBean.username}" 
+                          a:placeholder="Username">
+                        </h:inputText>
+                        <h:message for="username" style="color:red" />
+                      </h:panelGroup>
+                      <h:panelGroup class="input-group">
+                        <div class="input-group-prepend">
+                          <span class="input-group-text" id="password-addon"><i class="fa fa-key fa-fw"/></span>
+                        </div>
+                        <br/>
+                        <h:inputSecret class="form-control placeholder-darkgray" aria-describedby="password-addon"
+                          a:placeholder="Password" value="#{loginBean.password}"
+                          id="password" />
+                      </h:panelGroup>
+                      <div class="form-group last text-right">
+                        <div class="col-sm-offset-3 col-sm-9">
+                          <h:commandButton class="btn btn-outline-dark" id="submit" value="#{uiconsts['login']}">
+                            <f:ajax execute="@form" render="@form" listener="#{loginBean.validateUsernamePassword()}" />
+                          </h:commandButton>
+                        </div>
+                      </div>
+                      <!-- is this working? -->
+                      <h:messages globalOnly="true" style="color:red" />
+                    </div>
+                  </div>
+                </div>
+              </h:form>
+            </div>
+          </h:panelGroup>
+          <h:panelGroup rendered="#{externalContext.userPrincipal ne null}"> 
+            <div class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" style="color: black;" href="#" id="userDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <h:panelGroup class="fa #{request.isUserInRole('ADMIN_ROLE') ? 'fa-user-cog': 'fa-user-circle'}">
+                 <h:outputText value=" Welcome #{externalContext.userPrincipal.name}"/> 
+                </h:panelGroup>
+              </a>
+              <div class="dropdown-menu" aria-labelledby="userDropdown">
+                <div class="dropdown-item">
+                  <h:form id="logout">
+                    <h:commandButton action="#{loginBean.logout()}" value="#{uiconsts['signout']}" />
+                  </h:form>
+                </div>
+              </div>
+            </div>
+          </h:panelGroup>
+        </div>
+      </nav>
+      
+      <!-- footer
+         Bootstrap CSS is clever - even though this element is defined second under the 'container-fluid',
+         it is fixed to the bottom of the page
+       -->
+      <footer class="footer fixed-bottom bg-light text-center">
+        <h:outputText class="text-muted credit" value="Brought to you by #{uiconsts['footer']} (v#{uiconsts['version']})"/>
+      </footer>  
+
+      <!-- main content -->
+      <div id="main" role="main" class="main col-12">
+      
+        <!-- panel group for the option selection -->
+        <h:panelGroup rendered="#{(externalContext.userPrincipal ne null)}">
+          <h:form id="chooseOption">
+            <h:selectOneMenu id="choose_option" styleClass="form-control placeholder-darkgray"
+			  aria-describedby="option-addon"
+			  value="#{mainController.selectedOption}">
+			  <f:selectItem itemValue="1" itemLabel="#{uiconsts['manage_students']}" />
+			  <f:selectItem itemValue="2" itemLabel="Manage Courses" />
+			  <f:selectItem itemValue="3" itemLabel="Manage Professors" />
+			  <f:selectItem itemValue="4" itemLabel="Manage Student Clubs" />
+			  <f:selectItem itemValue="5" itemLabel="Manage Course Registrations" />
+			  <f:ajax listener="#{mainController.performOptionSelection()}" render="main" />
+			</h:selectOneMenu>
+            <h:commandButton value="#{uiconsts['submitLabel']}" action="#{mainController.submitForm()}" /> 
+          </h:form>
+        </h:panelGroup>
+      
+        <!-- panel group for student management -->
+        <h:panelGroup rendered="#{(externalContext.userPrincipal ne null) and (mainController.optionChosen == 'Student Management')}"> 
+          <h:panelGroup rendered="#{request.isUserInRole('ADMIN_ROLE')}">
+            <h:form id="addStudent">
+              <h:commandLink action="#{studentController.toggleAdding()}">
+                <i class="fa fa-user-plus" />&#xa0;<h:outputText value="#{uiconsts['addStudentTitle']}" />
+              </h:commandLink>
+              <h:panelGroup rendered="#{studentController.adding}">
+                <h:panelGrid columns="2" cellpadding="2" cellspacing="1">
+                  <h:panelGroup class="input-group">
+                    <div class="input-group-prepend">
+                      <span class="input-group-text" id="firstName-addon"><i class="fa fa-edit fa-fw"/></span>
+                    </div>
+                    <h:inputText type="text" id="new_firstName" style="width: 50em;" styleClass="form-control placeholder-darkgray"
+                      aria-describedby="firstName-addon"
+                      validatorMessage="#{uiconsts['enter_valid_string']}" value="#{newStudent.firstName}"
+                      a:placeholder="#{uiconsts['columnLabel_FirstName']}">
+                      <f:validateLength minimum="1" maximum="100" />
+                    </h:inputText>
+                  </h:panelGroup>
+                  <h:message for="new_firstName" style="color:red" />
+                  <h:panelGroup class="input-group">
+                    <div class="input-group-prepend">
+                      <span class="input-group-text" id="lastName-addon"><i class="fa fa-edit fa-fw"/></span>
+                    </div>
+                    <h:inputText type="text" id="new_lastName" styleClass="form-control placeholder-darkgray"
+                      aria-describedby="lastName-addon"
+                      validatorMessage="#{uiconsts['enter_valid_string']}"
+                      value="#{newStudent.lastName}" a:placeholder="#{uiconsts['columnLabel_LastName']}">
+                      <f:validateLength minimum="1" maximum="100" />
+                    </h:inputText>
+                  </h:panelGroup>
+                  <h:message for="new_lastName" style="color:red" />
+                  <h:panelGroup class="input-group">
+                    <div class="input-group-prepend">
+                      <span class="input-group-text" id="email-addon"><i class="fa fa-envelope fa-fw"/></span>
+                    </div>
+                    <h:inputText type="text" id="new_email" styleClass="form-control placeholder-darkgray"
+                      aria-describedby="email-addon"
+                      validatorMessage="#{uiconsts['enter_valid_email']}"
+                      value="#{newStudent.email}" a:placeholder="#{uiconsts['columnLabel_Email']}">
+                      <f:validateRegex pattern=".+@.+" />
+                    </h:inputText>
+                  </h:panelGroup>
+                  <h:message for="new_email" style="color:red" />
+                  <h:panelGroup class="input-group">
+                    <div class="input-group-prepend">
+                      <span class="input-group-text" id="phone-addon"><i class="fa fa-phone fa-fw"/></span>
+                    </div>
+                    <h:inputText type="text" id="new_phone" styleClass="form-control placeholder-darkgray"
+                      aria-describedby="phone-addon"
+                      validatorMessage="#{uiconsts['enter_valid_string']}"
+                      value="#{newStudent.phone}" a:placeholder="#{uiconsts['columnLabel_Phone']}">
+                      <f:validateLength minimum="1" maximum="100" />
+                    </h:inputText>
+                  </h:panelGroup>
+                  <h:message for="new_phone" style="color:red" />
+  			      <h:panelGroup class="input-group">
+			        <!-- separation with program icon -->
+				    <div class="input-group-prepend">
+				      <span class="input-group-text" id="program-addon"><i
+				        class="fas fa-book fa-fw" />
+				      </span>
+				    </div>
+				    <!-- input field for the program of a new student attached NewStudentView-->
+				    <h:selectOneMenu id="new_program" styleClass="form-control placeholder-darkgray"
+				      aria-describedby="program-addon"
+				      validatorMessage="#{uiconsts['enter_valid_string']}"
+				      value="#{newStudent.program}">
+				      <f:selectItem itemLabel="#{uiconsts['columnLabel_Program']}" itemDisabled="true" />
+     			      <f:selectItems value="#{studentController.programs}"/>
+				    </h:selectOneMenu>
+			      </h:panelGroup>
+                </h:panelGrid>
+                <h:panelGrid id="actions" columns="2" cellpadding="10">
+                  <h:commandLink action="#{newStudent.addStudent()}" rendered="#{studentController.adding}">
+                    <i class="fa fa-user-plus fa-fw" />&#xa0;<h:outputText class="text-success" value="#{uiconsts['submitLabel']}" />
+                  </h:commandLink>
+                  <h:commandLink action="#{studentController.toggleAdding()}" immediate="true" 
+                    rendered="#{studentController.adding}">
+                    <i class="fa fa-undo fa-fw" />&#xa0;<h:outputText class="text-primary" value="#{uiconsts['cancelLabel']}" />
+                  </h:commandLink>
+                </h:panelGrid>
+              </h:panelGroup>
+            </h:form>
+            <br/>
+          </h:panelGroup>
+          <h:form id="studentList">
+            <h:panelGroup rendered="#{externalContext.userPrincipal ne null}" >
+              <h:dataTable value="#{studentController.students}" var="student"
+                styleClass="table table-striped table-bordered table-hover"
+                headerClass="thead-light"
+                captionClass="text-center">
+                <h:column styleClass="width: 5%;">
+                  <f:facet name="header">#{uiconsts['columnLabel_Id']}</f:facet>
+                  <h:outputText value="#{student.id}" style="color:#000;" />
+                </h:column>
+                <h:column>
+                  <f:facet name="header">#{uiconsts['columnLabel_FirstName']}</f:facet>
+                  <h:outputText value="#{student.firstName}" rendered="#{not student.editable}" />
+                  <h:inputText id="firstName_editable" size="12" validatorMessage="#{uiconsts['enter_valid_string']}"
+                    value="#{student.firstName}" rendered="#{student.editable}">
+                    <f:validateLength minimum="1" maximum="100" />
+                  </h:inputText>
+                  <br/>
+                  <h:message for="firstName_editable" style="color:red" />
+                </h:column>
+                <h:column>
+                  <f:facet name="header">#{uiconsts['columnLabel_LastName']}</f:facet>
+                  <h:outputText value="#{student.lastName}" rendered="#{not student.editable}" />
+                  <h:inputText id="lastName_editable" size="12" validatorMessage="#{uiconsts['enter_valid_string']}"
+                    value="#{student.lastName}" rendered="#{student.editable}">
+                    <f:validateLength minimum="1" maximum="100" />
+                  </h:inputText>
+                  <br/>
+                  <h:message for="lastName_editable" style="color:red" />
+                </h:column>
+                <h:column>
+                  <f:facet name="header">#{uiconsts['columnLabel_Email']}</f:facet>
+                  <h:outputText value="#{student.email}" rendered="#{not student.editable}" />
+                  <h:inputText id="email_editable" size="12" validatorMessage="#{uiconsts['enter_valid_email']}"
+                    value="#{student.email}" rendered="#{student.editable}">
+                    <f:validateRegex pattern=".+@.+" />
+                  </h:inputText>
+                  <br/>
+                  <h:message for="email_editable" style="color:red" />
+                </h:column>
+                <h:column>
+                  <f:facet name="header">#{uiconsts['columnLabel_Phone']}</f:facet>
+                  <h:outputText value="#{student.phone}" rendered="#{not student.editable}" />
+                  <h:inputText id="phone_editable" size="12" validatorMessage="#{uiconsts['enter_valid_string']}"
+                    value="#{student.phone}" rendered="#{student.editable}">
+                    <f:validateLength minimum="1" maximum="100" />
+                  </h:inputText>
+                  <br/>
+                  <h:message for="phone_editable" style="color:red" />
+                </h:column>
+                <h:column>
+                  <f:facet name="header">#{uiconsts['columnLabel_Program']}</f:facet>
+                  <h:outputText value="#{student.program}" rendered="#{not student.editable}" />
+ 			      <h:selectOneMenu id="program_editable"
+				    validatorMessage="#{uiconsts['enter_valid_string']}"
+				    value="#{student.program}" rendered="#{student.editable}">
+     			    <f:selectItems value="#{studentController.programs}"/>
+			      </h:selectOneMenu>
+                  <br/>
+                  <h:message for="program_editable" style="color:red" />
+                </h:column>
+                <!-- Action column -->
+                <h:column rendered="#{request.isUserInRole('ADMIN_ROLE')}">
+                  <f:facet name="header">#{uiconsts['columnLabel_Action']}</f:facet>
+                  <h:commandLink action="#{studentController.editStudent(student)}" rendered="#{not student.editable}">
+                    <i class="fa fa-edit fa-fw" />&#xa0;<h:outputText value="#{uiconsts['editLabel']}" />
+                  </h:commandLink>
+                  &#xa0;
+                  <h:commandLink action="#{studentController.updateStudent(student)}" rendered="#{student.editable}">
+                    <i class="fa fa-save fa-fw" />&#xa0;<h:outputText class="text-success" value="#{uiconsts['submitLabel']}" />
+                  </h:commandLink>
+                  &#xa0;
+                  <h:commandLink action="#{studentController.cancelUpdate(student)}" immediate="true"
+                    rendered="#{student.editable}">
+                    <i class="fa fa-undo fa-fw" />&#xa0;<h:outputText value="#{uiconsts['cancelLabel']}" />
+                  </h:commandLink>
+                  &#xa0;
+                  <h:panelGroup rendered="#{not student.editable}">
+                    <a href="#" data-toggle="modal" data-target="#removeStudentModal#{student.id}"><span class="fa fa-trash fa-fw" style="color:red" />&#xa0;<h:outputText value="#{uiconsts['deleteLabel']}" /></a>
+                    <div class="modal fade" tabindex="-1" role="dialog" id="removeStudentModal#{student.id}">
+                      <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&#8855;</span></button>
+                          </div>
+                          <div class="modal-body">
+                            <p>#{uiconsts['russ']} (#{student.id})</p>
+                          </div>
+                          <div class="modal-footer">
+                            <div class="form-group last text-right">
+                              <button type="button" class="btn btn-outline-default" data-dismiss="modal">#{uiconsts['cancelLabel']}</button>
+                              <h:panelGroup>
+                                <button type="button" class="btn btn-outline-dark" data-dismiss="modal">#{uiconsts['deleteLabel']}
+                                  <f:ajax event="click" listener="#{studentController.deleteStudent(student.id)}" render="@form :studentList"/>
+                                </button>
+                              </h:panelGroup>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>        
+                  </h:panelGroup>
+                </h:column>
+              </h:dataTable>
+              <h:panelGroup class="refreshFooter">
+                <h:commandButton value="#{uiconsts['refreshButtonLabel']}" action="#{studentController.refreshStudentForm()}" /> 
+              </h:panelGroup>
+            </h:panelGroup>
+          </h:form>
+          <h:messages globalOnly="true" layout="table" styleClass="alert alert-danger"/>
+        </h:panelGroup>
+
+        <!-- add your different panel groups here -->
+
+		<!-- COURSE MANAGEMENT -->
+		<h:panelGroup rendered="#{(externalContext.userPrincipal ne null) and (mainController.selectedOption eq 2)}">
+		  <h:form id="addCourse">
+		    <h:panelGroup rendered="#{externalContext.userPrincipal ne null}">
+		      <h:commandLink action="#{courseController.toggleAdding()}" rendered="#{request.isUserInRole('ADMIN_ROLE')}">
+		        <i class="fa fa-plus-circle fa-fw" />&#xa0;<h:outputText value="Add Course" />
+		      </h:commandLink>
+		      <h:panelGroup id="addNewCourse" rendered="#{courseController.adding}">
+		        <h:panelGrid columns="2" cellpadding="10">
+		          <h:panelGroup class="input-group">
+		            <div class="input-group-prepend">
+		              <span class="input-group-text"><i class="fas fa-book fa-fw" /></span>
+		            </div>
+		            <h:inputText id="new_courseCode" styleClass="form-control"
+		              value="#{newCourse.courseCode}" a:placeholder="Course Code">
+		              <f:validateLength minimum="1" maximum="20" />
+		            </h:inputText>
+		          </h:panelGroup>
+		          <h:panelGroup class="input-group">
+		            <div class="input-group-prepend">
+		              <span class="input-group-text"><i class="fas fa-heading fa-fw" /></span>
+		            </div>
+		            <h:inputText id="new_courseTitle" styleClass="form-control"
+		              value="#{newCourse.courseTitle}" a:placeholder="Course Title">
+		              <f:validateLength minimum="1" maximum="200" />
+		            </h:inputText>
+		          </h:panelGroup>
+		          <h:panelGroup class="input-group">
+		            <div class="input-group-prepend">
+		              <span class="input-group-text"><i class="fas fa-star fa-fw" /></span>
+		            </div>
+		            <h:inputText id="new_creditUnits" styleClass="form-control"
+		              value="#{newCourse.creditUnits}" a:placeholder="Credit Units">
+		              <f:validateLongRange minimum="1" maximum="10" />
+		            </h:inputText>
+		          </h:panelGroup>
+		          <h:panelGroup class="input-group">
+		            <div class="input-group-prepend">
+		              <span class="input-group-text"><i class="fas fa-laptop fa-fw" /></span>
+		            </div>
+		            <h:selectOneMenu id="new_online" styleClass="form-control"
+		              value="#{newCourse.online}">
+		              <f:selectItem itemValue="0" itemLabel="In-Person" />
+		              <f:selectItem itemValue="1" itemLabel="Online" />
+		            </h:selectOneMenu>
+		          </h:panelGroup>
+		        </h:panelGrid>
+		        <h:panelGrid columns="2" cellpadding="10">
+		          <h:commandLink action="#{newCourse.addCourse()}">
+		            <i class="fa fa-plus-circle fa-fw" />&#xa0;<h:outputText class="text-success" value="#{uiconsts['submitLabel']}" />
+		          </h:commandLink>
+		          <h:commandLink action="#{courseController.toggleAdding()}" immediate="true">
+		            <i class="fa fa-undo fa-fw" />&#xa0;<h:outputText class="text-primary" value="#{uiconsts['cancelLabel']}" />
+		          </h:commandLink>
+		        </h:panelGrid>
+		      </h:panelGroup>
+		    </h:panelGroup>
+		  </h:form>
+		  <br/>
+		  <h:form id="courseList">
+		    <h:panelGroup rendered="#{externalContext.userPrincipal ne null}">
+		      <h:dataTable value="#{courseController.courses}" var="course"
+		        styleClass="table table-striped table-bordered table-hover"
+		        headerClass="thead-light">
+		        <h:column>
+		          <f:facet name="header">ID</f:facet>
+		          <h:outputText value="#{course.id}" />
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Course Code</f:facet>
+		          <h:outputText value="#{course.courseCode}" rendered="#{not course.editable}" />
+		          <h:inputText id="courseCode_edit" value="#{course.courseCode}" rendered="#{course.editable}">
+		            <f:validateLength minimum="1" maximum="20" />
+		          </h:inputText>
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Course Title</f:facet>
+		          <h:outputText value="#{course.courseTitle}" rendered="#{not course.editable}" />
+		          <h:inputText id="courseTitle_edit" value="#{course.courseTitle}" rendered="#{course.editable}">
+		            <f:validateLength minimum="1" maximum="200" />
+		          </h:inputText>
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Credit Units</f:facet>
+		          <h:outputText value="#{course.creditUnits}" rendered="#{not course.editable}" />
+		          <h:inputText id="creditUnits_edit" value="#{course.creditUnits}" rendered="#{course.editable}" />
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Online</f:facet>
+		          <h:outputText value="#{course.online == 1 ? 'Yes' : 'No'}" rendered="#{not course.editable}" />
+		          <h:selectOneMenu id="online_edit" value="#{course.online}" rendered="#{course.editable}">
+		            <f:selectItem itemValue="0" itemLabel="No" />
+		            <f:selectItem itemValue="1" itemLabel="Yes" />
+		          </h:selectOneMenu>
+		        </h:column>
+		        <h:column rendered="#{request.isUserInRole('ADMIN_ROLE')}">
+		          <f:facet name="header">Action</f:facet>
+		          <h:commandLink action="#{courseController.editCourse(course)}" rendered="#{not course.editable}">
+		            <i class="fa fa-edit fa-fw" />&#xa0;Edit
+		          </h:commandLink>
+		          &#xa0;
+		          <h:commandLink action="#{courseController.updateCourse(course)}" rendered="#{course.editable}">
+		            <i class="fa fa-save fa-fw" />&#xa0;Save
+		          </h:commandLink>
+		          &#xa0;
+		          <h:commandLink action="#{courseController.cancelUpdate(course)}" rendered="#{course.editable}">
+		            <i class="fa fa-undo fa-fw" />&#xa0;Cancel
+		          </h:commandLink>
+		          &#xa0;
+		          <h:commandLink action="#{courseController.deleteCourse(course.id)}" rendered="#{not course.editable}"
+		            onclick="return confirm('Delete this course?');">
+		            <i class="fa fa-trash fa-fw" style="color:red" />&#xa0;Delete
+		          </h:commandLink>
+		        </h:column>
+		      </h:dataTable>
+		      <h:panelGroup class="refreshFooter">
+		        <h:commandButton value="#{uiconsts['refreshButtonLabel']}" action="#{courseController.refreshCourseForm()}" />
+		      </h:panelGroup>
+		    </h:panelGroup>
+		  </h:form>
+		</h:panelGroup>
+        
+        <!-- PROFESSOR MANAGEMENT -->
+		<h:panelGroup rendered="#{(externalContext.userPrincipal ne null) and (mainController.selectedOption eq 3)}">
+		  <h:form id="addProfessor">
+		    <h:panelGroup rendered="#{externalContext.userPrincipal ne null}">
+		      <h:commandLink action="#{professorController.toggleAdding()}" rendered="#{request.isUserInRole('ADMIN_ROLE')}">
+		        <i class="fa fa-plus-circle fa-fw" />&#xa0;<h:outputText value="Add Professor" />
+		      </h:commandLink>
+		      <h:panelGroup id="addNewProfessor" rendered="#{professorController.adding}">
+		        <h:panelGrid columns="2" cellpadding="10">
+		          <h:panelGroup class="input-group">
+		            <div class="input-group-prepend">
+		              <span class="input-group-text"><i class="fas fa-user fa-fw" /></span>
+		            </div>
+		            <h:inputText id="new_profFirstName" styleClass="form-control"
+		              value="#{newProfessor.firstName}" a:placeholder="First Name">
+		              <f:validateLength minimum="1" maximum="100" />
+		            </h:inputText>
+		          </h:panelGroup>
+		          <h:panelGroup class="input-group">
+		            <div class="input-group-prepend">
+		              <span class="input-group-text"><i class="fas fa-user fa-fw" /></span>
+		            </div>
+		            <h:inputText id="new_profLastName" styleClass="form-control"
+		              value="#{newProfessor.lastName}" a:placeholder="Last Name">
+		              <f:validateLength minimum="1" maximum="100" />
+		            </h:inputText>
+		          </h:panelGroup>
+		          <h:panelGroup class="input-group">
+		            <div class="input-group-prepend">
+		              <span class="input-group-text"><i class="fas fa-graduation-cap fa-fw" /></span>
+		            </div>
+		            <h:inputText id="new_degree" styleClass="form-control"
+		              value="#{newProfessor.degree}" a:placeholder="Degree">
+		              <f:validateLength minimum="1" maximum="50" />
+		            </h:inputText>
+		          </h:panelGroup>
+		        </h:panelGrid>
+		        <h:panelGrid columns="2" cellpadding="10">
+		          <h:commandLink action="#{newProfessor.addProfessor()}">
+		            <i class="fa fa-plus-circle fa-fw" />&#xa0;<h:outputText class="text-success" value="#{uiconsts['submitLabel']}" />
+		          </h:commandLink>
+		          <h:commandLink action="#{professorController.toggleAdding()}" immediate="true">
+		            <i class="fa fa-undo fa-fw" />&#xa0;<h:outputText class="text-primary" value="#{uiconsts['cancelLabel']}" />
+		          </h:commandLink>
+		        </h:panelGrid>
+		      </h:panelGroup>
+		    </h:panelGroup>
+		  </h:form>
+		  <br/>
+		  <h:form id="professorList">
+		    <h:panelGroup rendered="#{externalContext.userPrincipal ne null}">
+		      <h:dataTable value="#{professorController.professors}" var="professor"
+		        styleClass="table table-striped table-bordered table-hover"
+		        headerClass="thead-light">
+		        <h:column>
+		          <f:facet name="header">ID</f:facet>
+		          <h:outputText value="#{professor.id}" />
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">First Name</f:facet>
+		          <h:outputText value="#{professor.firstName}" rendered="#{not professor.editable}" />
+		          <h:inputText id="profFirstName_edit" value="#{professor.firstName}" rendered="#{professor.editable}">
+		            <f:validateLength minimum="1" maximum="100" />
+		          </h:inputText>
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Last Name</f:facet>
+		          <h:outputText value="#{professor.lastName}" rendered="#{not professor.editable}" />
+		          <h:inputText id="profLastName_edit" value="#{professor.lastName}" rendered="#{professor.editable}">
+		            <f:validateLength minimum="1" maximum="100" />
+		          </h:inputText>
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Degree</f:facet>
+		          <h:outputText value="#{professor.degree}" rendered="#{not professor.editable}" />
+		          <h:inputText id="degree_edit" value="#{professor.degree}" rendered="#{professor.editable}" />
+		        </h:column>
+		        <h:column rendered="#{request.isUserInRole('ADMIN_ROLE')}">
+		          <f:facet name="header">Action</f:facet>
+		          <h:commandLink action="#{professorController.editProfessor(professor)}" rendered="#{not professor.editable}">
+		            <i class="fa fa-edit fa-fw" />&#xa0;Edit
+		          </h:commandLink>
+		          &#xa0;
+		          <h:commandLink action="#{professorController.updateProfessor(professor)}" rendered="#{professor.editable}">
+		            <i class="fa fa-save fa-fw" />&#xa0;Save
+		          </h:commandLink>
+		          &#xa0;
+		          <h:commandLink action="#{professorController.cancelUpdate(professor)}" rendered="#{professor.editable}">
+		            <i class="fa fa-undo fa-fw" />&#xa0;Cancel
+		          </h:commandLink>
+		          &#xa0;
+		          <h:commandLink action="#{professorController.deleteProfessor(professor.id)}" rendered="#{not professor.editable}"
+		            onclick="return confirm('Delete this professor?');">
+		            <i class="fa fa-trash fa-fw" style="color:red" />&#xa0;Delete
+		          </h:commandLink>
+		        </h:column>
+		      </h:dataTable>
+		      <h:panelGroup class="refreshFooter">
+		        <h:commandButton value="#{uiconsts['refreshButtonLabel']}" action="#{professorController.refreshProfessorForm()}" />
+		      </h:panelGroup>
+		    </h:panelGroup>
+		  </h:form>
+		</h:panelGroup>
+		
+		<!-- STUDENT CLUB MANAGEMENT -->
+		<h:panelGroup rendered="#{(externalContext.userPrincipal ne null) and (mainController.selectedOption eq 4)}">
+		  <h:form id="addStudentClub">
+		    <h:panelGroup rendered="#{externalContext.userPrincipal ne null}">
+		      <h:commandLink action="#{studentClubController.toggleAdding()}" rendered="#{request.isUserInRole('ADMIN_ROLE')}">
+		        <i class="fa fa-plus-circle fa-fw" />&#xa0;<h:outputText value="Add Student Club" />
+		      </h:commandLink>
+		      <h:panelGroup id="addNewStudentClub" rendered="#{studentClubController.adding}">
+		        <h:panelGrid columns="2" cellpadding="10">
+		          <h:panelGroup class="input-group">
+		            <div class="input-group-prepend">
+		              <span class="input-group-text"><i class="fas fa-users fa-fw" /></span>
+		            </div>
+		            <h:inputText id="new_clubName" styleClass="form-control"
+		              value="#{newStudentClub.name}" a:placeholder="Club Name">
+		              <f:validateLength minimum="1" maximum="100" />
+		            </h:inputText>
+		          </h:panelGroup>
+		          <h:panelGroup class="input-group">
+		            <div class="input-group-prepend">
+		              <span class="input-group-text"><i class="fas fa-info-circle fa-fw" /></span>
+		            </div>
+		            <h:inputText id="new_clubDesc" styleClass="form-control"
+		              value="#{newStudentClub.desc}" a:placeholder="Description">
+		              <f:validateLength minimum="1" maximum="200" />
+		            </h:inputText>
+		          </h:panelGroup>
+		        </h:panelGrid>
+		        <h:panelGrid columns="2" cellpadding="10">
+		          <h:commandLink action="#{newStudentClub.addStudentClub()}">
+		            <i class="fa fa-plus-circle fa-fw" />&#xa0;<h:outputText class="text-success" value="#{uiconsts['submitLabel']}" />
+		          </h:commandLink>
+		          <h:commandLink action="#{studentClubController.toggleAdding()}" immediate="true">
+		            <i class="fa fa-undo fa-fw" />&#xa0;<h:outputText class="text-primary" value="#{uiconsts['cancelLabel']}" />
+		          </h:commandLink>
+		        </h:panelGrid>
+		      </h:panelGroup>
+		    </h:panelGroup>
+		  </h:form>
+		  <br/>
+		  <h:form id="studentClubList">
+		    <h:panelGroup rendered="#{externalContext.userPrincipal ne null}">
+		      <h:dataTable value="#{studentClubController.studentClubs}" var="club"
+		        styleClass="table table-striped table-bordered table-hover"
+		        headerClass="thead-light">
+		        <h:column>
+		          <f:facet name="header">ID</f:facet>
+		          <h:outputText value="#{club.id}" />
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Name</f:facet>
+		          <h:outputText value="#{club.name}" rendered="#{not club.editable}" />
+		          <h:inputText id="clubName_edit" value="#{club.name}" rendered="#{club.editable}">
+		            <f:validateLength minimum="1" maximum="100" />
+		          </h:inputText>
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Description</f:facet>
+		          <h:outputText value="#{club.desc}" rendered="#{not club.editable}" />
+		          <h:inputText id="clubDesc_edit" value="#{club.desc}" rendered="#{club.editable}">
+		            <f:validateLength minimum="1" maximum="200" />
+		          </h:inputText>
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Type</f:facet>
+		          <h:outputText value="#{club.academic ? 'Academic' : 'Non-Academic'}" />
+		        </h:column>
+		        <h:column rendered="#{request.isUserInRole('ADMIN_ROLE')}">
+		          <f:facet name="header">Action</f:facet>
+		          <h:commandLink action="#{studentClubController.editStudentClub(club)}" rendered="#{not club.editable}">
+		            <i class="fa fa-edit fa-fw" />&#xa0;Edit
+		          </h:commandLink>
+		          &#xa0;
+		          <h:commandLink action="#{studentClubController.updateStudentClub(club)}" rendered="#{club.editable}">
+		            <i class="fa fa-save fa-fw" />&#xa0;Save
+		          </h:commandLink>
+		          &#xa0;
+		          <h:commandLink action="#{studentClubController.cancelUpdate(club)}" rendered="#{club.editable}">
+		            <i class="fa fa-undo fa-fw" />&#xa0;Cancel
+		          </h:commandLink>
+		          &#xa0;
+		          <h:commandLink action="#{studentClubController.deleteStudentClub(club.id)}" rendered="#{not club.editable}"
+		            onclick="return confirm('Delete this club?');">
+		            <i class="fa fa-trash fa-fw" style="color:red" />&#xa0;Delete
+		          </h:commandLink>
+		        </h:column>
+		      </h:dataTable>
+		      <h:panelGroup class="refreshFooter">
+		        <h:commandButton value="#{uiconsts['refreshButtonLabel']}" action="#{studentClubController.refreshStudentClubForm()}" />
+		      </h:panelGroup>
+		    </h:panelGroup>
+		  </h:form>
+		</h:panelGroup>
+		
+		<!-- COURSE REGISTRATION MANAGEMENT -->
+		<h:panelGroup rendered="#{(externalContext.userPrincipal ne null) and (mainController.selectedOption eq 5)}">
+		  <h:form id="courseRegistrationList">
+		    <h:panelGroup rendered="#{externalContext.userPrincipal ne null}">
+		      <h3>Course Registrations</h3>
+		      <h:dataTable value="#{courseRegistrationController.courseRegistrations}" var="reg"
+		        styleClass="table table-striped table-bordered table-hover"
+		        headerClass="thead-light">
+		        <h:column>
+		          <f:facet name="header">Student ID</f:facet>
+		          <h:outputText value="#{reg.student.id}" />
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Student Name</f:facet>
+		          <h:outputText value="#{reg.student.firstName} #{reg.student.lastName}" />
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Course</f:facet>
+		          <h:outputText value="#{reg.course.courseCode}" />
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Professor</f:facet>
+		          <h:outputText value="#{reg.professor.firstName} #{reg.professor.lastName}" />
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Year</f:facet>
+		          <h:outputText value="#{reg.year}" />
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Semester</f:facet>
+		          <h:outputText value="#{reg.semester}" />
+		        </h:column>
+		        <h:column>
+		          <f:facet name="header">Grade</f:facet>
+		          <h:outputText value="#{reg.letterGrade}" />
+		        </h:column>
+		        <h:column rendered="#{request.isUserInRole('ADMIN_ROLE')}">
+		          <f:facet name="header">Action</f:facet>
+		          <h:commandLink action="#{courseRegistrationController.deleteCourseRegistration(reg.student.id, reg.course.id)}"
+		            onclick="return confirm('Delete this registration?');">
+		            <i class="fa fa-trash fa-fw" style="color:red" />&#xa0;Delete
+		          </h:commandLink>
+		        </h:column>
+		      </h:dataTable>
+		      <h:panelGroup class="refreshFooter">
+		        <h:commandButton value="#{uiconsts['refreshButtonLabel']}" 
+		          action="#{courseRegistrationController.refreshCourseRegistrationForm()}" />
+		      </h:panelGroup>
+		    </h:panelGroup>
+		  </h:form>
+		</h:panelGroup>
+
+        
+      </div>
+    </div>
+  </h:body>
+</html>
